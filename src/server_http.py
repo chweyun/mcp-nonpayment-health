@@ -95,6 +95,19 @@ async def health():
     return {"status": "healthy", "service": "nonpayment-health"}
 
 
+@app.options("/messages")
+async def messages_options():
+    """Handle CORS preflight requests"""
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+        }
+    )
+
+
 @app.post("/messages")
 async def messages_endpoint(request: Request):
     """
@@ -112,6 +125,7 @@ async def messages_endpoint(request: Request):
         # Handle different MCP methods
         if method == "initialize":
             # Return server capabilities
+            # MCP spec requires protocolVersion and capabilities
             response = {
                 "jsonrpc": "2.0",
                 "id": request_id,
@@ -128,6 +142,19 @@ async def messages_endpoint(request: Request):
             }
             return JSONResponse(content=response)
         
+        elif method is None:
+            return JSONResponse(
+                content={
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32600,
+                        "message": "Invalid Request: method is required"
+                    }
+                },
+                status_code=400
+            )
+        
         elif method == "tools/list":
             # Get list of tools from server
             tools_list = await mcp_server.list_tools()
@@ -135,7 +162,7 @@ async def messages_endpoint(request: Request):
             tools_dict = [
                 {
                     "name": tool.name,
-                    "description": tool.description,
+                    "description": tool.description if tool.description else "",
                     "inputSchema": tool.inputSchema
                 }
                 for tool in tools_list
@@ -288,13 +315,27 @@ async def messages_endpoint(request: Request):
     
     except json.JSONDecodeError:
         return JSONResponse(
-            content={"error": "Invalid JSON"},
+            content={
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {
+                    "code": -32700,
+                    "message": "Parse error"
+                }
+            },
             status_code=400
         )
     except Exception as e:
         logger.error(f"Error in messages endpoint: {str(e)}")
         return JSONResponse(
-            content={"error": str(e)},
+            content={
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {
+                    "code": -32603,
+                    "message": f"Internal error: {str(e)}"
+                }
+            },
             status_code=500
         )
 
