@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  nonpayment-health:
+    build: .
+    container_name: nonpayment-health-mcp
+    ports:
+      - "8001:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - DEBUG=True
+      - API_PREFIX=/nonpayment-health
+      - DATA_GO_KR_API_KEY=${DATA_GO_KR_API_KEY}
+    restart: unless-stopped
+    # Development mode: mount source code as volume for hot reload
+    volumes:
+      - ./src:/app/src
+      - ./run_server.py:/app/run_server.py
+
