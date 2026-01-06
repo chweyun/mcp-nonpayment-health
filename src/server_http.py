@@ -43,7 +43,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # API prefix for multi-server hosting
-API_PREFIX = os.getenv("API_PREFIX", "/nonpayment-health")
+# Set to empty string if reverse proxy handles the path
+API_PREFIX = os.getenv("API_PREFIX", "")
 
 # Create MCP server instance
 mcp_server = Server("nonpayment-health")

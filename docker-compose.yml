@@ -10,7 +10,6 @@ services:
       - PORT=8000
       - HOST=0.0.0.0
       - DEBUG=True
-      - API_PREFIX=/nonpayment-health
       - DATA_GO_KR_API_KEY=${DATA_GO_KR_API_KEY}
     restart: unless-stopped
     # Development mode: mount source code as volume for hot reload
