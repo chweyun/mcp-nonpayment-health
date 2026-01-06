@@ -2,10 +2,17 @@
 Decision support tools for non-payment items
 """
 import json
+import asyncio
+import logging
 from typing import Dict, Any, List, Optional
 from src.tools.hospital_tools import hospital_search, hospital_compare
 from src.tools.stats_tools import stats_by_region, stats_by_hospital_type
 from src.tools.code_tools import code_explain
+
+logger = logging.getLogger(__name__)
+
+# Overall timeout for decision operations (50 seconds to leave buffer for PlayMCP 1-minute timeout)
+DECISION_OPERATION_TIMEOUT = 50
 
 
 async def decision_cheapest_option(
@@ -72,6 +79,171 @@ async def decision_cheapest_option(
         }, ensure_ascii=False)
 
 
+async def _decision_reasonable_price_impl(
+    npay_cd: str,
+    price: float,
+    sido: Optional[str] = None
+) -> str:
+    """
+    Internal implementation of decision_reasonable_price (without timeout wrapper)
+    """
+    # First, verify code exists (quick check)
+    from src.tools.code_tools import code_hierarchy
+    code_check = await code_hierarchy(npay_cd)
+    code_data = json.loads(code_check)
+    
+    if not code_data.get("success"):
+        return json.dumps({
+            "success": False,
+            "error": f"Cannot determine reasonableness: Code {npay_cd} not found. Please verify the code is correct."
+        }, ensure_ascii=False)
+    
+    # Get statistics
+    if sido:
+        stats_result = await stats_by_region(npay_cd)
+        stats_data = json.loads(stats_result)
+        
+        if stats_data.get("success"):
+            regions = stats_data.get("regions", {})
+            region_data = regions.get(sido, {})
+            
+            if region_data:
+                avg_price = region_data.get("avg", 0)
+                min_price = region_data.get("min", 0)
+                max_price = region_data.get("max", 0)
+                
+                if avg_price > 0:
+                    # Calculate deviation from average
+                    deviation = abs(price - avg_price) / avg_price
+                    
+                    # Reasonable if within 20% of average
+                    is_reasonable = deviation <= 0.2
+                    
+                    # Determine judgement
+                    if is_reasonable:
+                        judgement = "합리적"
+                        basis = f"{sido} 지역 평균({avg_price:,}원) 대비 ±20% 이내"
+                    elif price > avg_price:
+                        judgement = "비싼 편"
+                        basis = f"{sido} 지역 평균({avg_price:,}원)보다 {((price - avg_price) / avg_price * 100):.1f}% 높음"
+                    else:
+                        judgement = "저렴한 편"
+                        basis = f"{sido} 지역 평균({avg_price:,}원)보다 {((avg_price - price) / avg_price * 100):.1f}% 낮음"
+                    
+                    result = {
+                        "success": True,
+                        "judgement": judgement,
+                        "basis": basis,
+                        "price": price,
+                        "region": sido,
+                        "statistics": {
+                            "average": avg_price,
+                            "min": min_price,
+                            "max": max_price
+                        },
+                        "deviation": deviation
+                    }
+                    
+                    return json.dumps(result, ensure_ascii=False, indent=2)
+            
+            # If region data not found but stats_by_region succeeded, try overall from same result
+            overall = stats_data.get("overall", {})
+            overall_avg = overall.get("avg", 0)
+            
+            if overall_avg > 0:
+                # Use overall statistics from region stats
+                deviation = abs(price - overall_avg) / overall_avg
+                is_reasonable = deviation <= 0.2
+                
+                if is_reasonable:
+                    judgement = "합리적"
+                    basis = f"전체 평균({overall_avg:,}원) 대비 ±20% 이내 ({sido} 지역 데이터 없음)"
+                elif price > overall_avg:
+                    judgement = "비싼 편"
+                    basis = f"전체 평균({overall_avg:,}원)보다 {((price - overall_avg) / overall_avg * 100):.1f}% 높음 ({sido} 지역 데이터 없음)"
+                else:
+                    judgement = "저렴한 편"
+                    basis = f"전체 평균({overall_avg:,}원)보다 {((overall_avg - price) / overall_avg * 100):.1f}% 낮음 ({sido} 지역 데이터 없음)"
+                
+                result = {
+                    "success": True,
+                    "judgement": judgement,
+                    "basis": basis,
+                    "price": price,
+                    "region": sido,
+                    "note": f"{sido} 지역별 데이터가 없어 전체 통계를 사용했습니다.",
+                    "statistics": {
+                        "average": overall_avg,
+                        "min": overall.get("min", 0),
+                        "max": overall.get("max", 0)
+                    },
+                    "deviation": deviation
+                }
+                
+                return json.dumps(result, ensure_ascii=False, indent=2)
+            # If stats_by_region succeeded but no data available, continue to fallback
+    
+    # Fallback to overall statistics from hospital type
+    stats_result = await stats_by_hospital_type(npay_cd)
+    stats_data = json.loads(stats_result)
+    
+    if not stats_data.get("success"):
+        # Try to get more detailed error message
+        error_msg = stats_data.get("error", "insufficient data")
+        logger.warning(f"CheckReasonablePrice failed for {npay_cd}: stats_by_hospital_type error - {error_msg}")
+        
+        # Code exists but no statistics available
+        code_name = code_data.get("fullName", npay_cd)
+        return json.dumps({
+            "success": False,
+            "error": f"Cannot determine reasonableness: Statistics data not available for code {npay_cd} ({code_name}). This code exists but may not have sufficient price data in the statistics database yet. You can try using SearchNonPaymentHospitals to find hospitals offering this item and check their prices directly.",
+            "codeName": code_name,
+            "suggestion": "Use SearchNonPaymentHospitals to find hospitals and check prices directly"
+        }, ensure_ascii=False)
+    
+    overall = stats_data.get("overall", {})
+    avg_price = overall.get("avg", 0)
+    
+    if avg_price == 0:
+        logger.warning(f"CheckReasonablePrice failed for {npay_cd}: avg_price is 0")
+        code_name = code_data.get("fullName", npay_cd)
+        return json.dumps({
+            "success": False,
+            "error": f"Cannot determine reasonableness: No average price data available for code {npay_cd} ({code_name}). This code exists but does not have sufficient price data in the statistics database. You can try using SearchNonPaymentHospitals to find hospitals offering this item.",
+            "codeName": code_name,
+            "suggestion": "Use SearchNonPaymentHospitals to find hospitals and check prices directly"
+        }, ensure_ascii=False)
+    
+    # Calculate deviation
+    deviation = abs(price - avg_price) / avg_price
+    is_reasonable = deviation <= 0.2
+    
+    if is_reasonable:
+        judgement = "합리적"
+        basis = f"전체 평균({avg_price:,}원) 대비 ±20% 이내"
+    elif price > avg_price:
+        judgement = "비싼 편"
+        basis = f"전체 평균({avg_price:,}원)보다 {((price - avg_price) / avg_price * 100):.1f}% 높음"
+    else:
+        judgement = "저렴한 편"
+        basis = f"전체 평균({avg_price:,}원)보다 {((avg_price - price) / avg_price * 100):.1f}% 낮음"
+    
+    result = {
+        "success": True,
+        "judgement": judgement,
+        "basis": basis,
+        "price": price,
+        "statistics": {
+            "average": avg_price,
+            "min": overall.get("min", 0),
+            "max": overall.get("max", 0)
+        },
+        "deviation": deviation
+    }
+    
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
 async def decision_reasonable_price(
     npay_cd: str,
     price: float,
@@ -89,102 +261,17 @@ async def decision_reasonable_price(
         JSON string with reasonableness assessment
     """
     try:
-        # Get statistics
-        if sido:
-            stats_result = await stats_by_region(npay_cd)
-            stats_data = json.loads(stats_result)
-            
-            if stats_data.get("success"):
-                regions = stats_data.get("regions", {})
-                region_data = regions.get(sido, {})
-                
-                if region_data:
-                    avg_price = region_data.get("avg", 0)
-                    min_price = region_data.get("min", 0)
-                    max_price = region_data.get("max", 0)
-                    
-                    if avg_price > 0:
-                        # Calculate deviation from average
-                        deviation = abs(price - avg_price) / avg_price
-                        
-                        # Reasonable if within 20% of average
-                        is_reasonable = deviation <= 0.2
-                        
-                        # Determine judgement
-                        if is_reasonable:
-                            judgement = "합리적"
-                            basis = f"{sido} 지역 평균({avg_price:,}원) 대비 ±20% 이내"
-                        elif price > avg_price:
-                            judgement = "비싼 편"
-                            basis = f"{sido} 지역 평균({avg_price:,}원)보다 {((price - avg_price) / avg_price * 100):.1f}% 높음"
-                        else:
-                            judgement = "저렴한 편"
-                            basis = f"{sido} 지역 평균({avg_price:,}원)보다 {((avg_price - price) / avg_price * 100):.1f}% 낮음"
-                        
-                        result = {
-                            "success": True,
-                            "judgement": judgement,
-                            "basis": basis,
-                            "price": price,
-                            "region": sido,
-                            "statistics": {
-                                "average": avg_price,
-                                "min": min_price,
-                                "max": max_price
-                            },
-                            "deviation": deviation
-                        }
-                        
-                        return json.dumps(result, ensure_ascii=False, indent=2)
-        
-        # Fallback to overall statistics
-        stats_result = await stats_by_hospital_type(npay_cd)
-        stats_data = json.loads(stats_result)
-        
-        if not stats_data.get("success"):
-            return json.dumps({
-                "success": False,
-                "error": "Cannot determine reasonableness: insufficient data"
-            }, ensure_ascii=False)
-        
-        overall = stats_data.get("overall", {})
-        avg_price = overall.get("avg", 0)
-        
-        if avg_price == 0:
-            return json.dumps({
-                "success": False,
-                "error": "Cannot determine reasonableness: no average price data"
-            }, ensure_ascii=False)
-        
-        # Calculate deviation
-        deviation = abs(price - avg_price) / avg_price
-        is_reasonable = deviation <= 0.2
-        
-        if is_reasonable:
-            judgement = "합리적"
-            basis = f"전체 평균({avg_price:,}원) 대비 ±20% 이내"
-        elif price > avg_price:
-            judgement = "비싼 편"
-            basis = f"전체 평균({avg_price:,}원)보다 {((price - avg_price) / avg_price * 100):.1f}% 높음"
-        else:
-            judgement = "저렴한 편"
-            basis = f"전체 평균({avg_price:,}원)보다 {((avg_price - price) / avg_price * 100):.1f}% 낮음"
-        
-        result = {
-            "success": True,
-            "judgement": judgement,
-            "basis": basis,
-            "price": price,
-            "statistics": {
-                "average": avg_price,
-                "min": overall.get("min", 0),
-                "max": overall.get("max", 0)
-            },
-            "deviation": deviation
-        }
-        
-        return json.dumps(result, ensure_ascii=False, indent=2)
-    
+        # Wrap with timeout
+        result = await asyncio.wait_for(
+            _decision_reasonable_price_impl(npay_cd, price, sido),
+            timeout=DECISION_OPERATION_TIMEOUT
+        )
+        return result
+    except asyncio.TimeoutError:
+        return json.dumps({
+            "success": False,
+            "error": f"Request timeout: Price reasonableness check for code {npay_cd} took too long. Please try again later."
+        }, ensure_ascii=False)
     except Exception as e:
         return json.dumps({
             "success": False,

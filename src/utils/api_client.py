@@ -2,6 +2,7 @@
 Public Data Portal API Client
 """
 import os
+import asyncio
 import aiohttp
 import xmltodict
 from typing import Dict, List, Optional, Any
@@ -10,6 +11,9 @@ from urllib.parse import urlencode
 
 BASE_URL = "http://apis.data.go.kr/B551182/nonPaymentDamtInfoService"
 SERVICE_KEY = os.getenv("DATA_GO_KR_API_KEY", "")
+
+# API timeout settings (in seconds)
+API_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=5)  # 10 seconds total, 5 seconds to connect
 
 
 async def call_api(
@@ -33,24 +37,29 @@ async def call_api(
     
     url = f"{BASE_URL}/{endpoint}"
     
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params=params) as response:
-            if response.status != 200:
-                raise Exception(f"API call failed with status {response.status}")
-            
-            text = await response.text()
-            data = xmltodict.parse(text)
-            
-            # Check for errors
-            if "response" in data:
-                header = data["response"].get("header", {})
-                result_code = header.get("resultCode", "")
-                result_msg = header.get("resultMsg", "")
+    try:
+        async with aiohttp.ClientSession(timeout=API_TIMEOUT) as session:
+            async with session.get(url, params=params) as response:
+                if response.status != 200:
+                    raise Exception(f"API call failed with status {response.status}")
                 
-                if result_code != "00":
-                    raise Exception(f"API error: {result_code} - {result_msg}")
-            
-            return data
+                text = await response.text()
+                data = xmltodict.parse(text)
+                
+                # Check for errors
+                if "response" in data:
+                    header = data["response"].get("header", {})
+                    result_code = header.get("resultCode", "")
+                    result_msg = header.get("resultMsg", "")
+                    
+                    if result_code != "00":
+                        raise Exception(f"API error: {result_code} - {result_msg}")
+                
+                return data
+    except aiohttp.ClientError as e:
+        raise Exception(f"API request timeout or network error: {str(e)}")
+    except asyncio.TimeoutError:
+        raise Exception("API request timeout: request took too long")
 
 
 async def get_non_payment_item_code_list2(

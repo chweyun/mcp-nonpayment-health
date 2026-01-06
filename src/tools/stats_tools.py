@@ -3,6 +3,7 @@ Statistical analysis tools for non-payment items
 """
 import json
 import math
+import asyncio
 from typing import Dict, Any, List, Optional
 from src.utils.api_client import (
     get_non_payment_item_sido_cd_list,
@@ -11,53 +12,79 @@ from src.utils.api_client import (
 )
 from src.utils.region_mapper import get_sido_name, get_hospital_type_name
 
+# Simple in-memory cache (cleared on each server restart)
+_stats_cache = {}
+CACHE_TTL = 3600  # 1 hour cache
 
-async def stats_by_region(npay_cd: str) -> str:
+# Overall timeout for stats operations (50 seconds to leave buffer for PlayMCP 1-minute timeout)
+STATS_OPERATION_TIMEOUT = 50
+
+
+async def _stats_by_region_impl(npay_cd: str) -> str:
     """
-    Get price statistics by region for a non-payment item
+    Internal implementation of stats_by_region (without timeout wrapper)
+    """
+    # Check cache first
+    cache_key = f"region_{npay_cd}"
+    if cache_key in _stats_cache:
+        cached_data, cached_time = _stats_cache[cache_key]
+        import time
+        if time.time() - cached_time < CACHE_TTL:
+            return cached_data
     
-    Args:
-        npay_cd: Non-payment code
-        
-    Returns:
-        JSON string with regional statistics
-    """
-    try:
-        # Get regional statistics
+    # Get first page to determine total pages
+    num_of_rows = 100
+    items, total_count = await get_non_payment_item_sido_cd_list(1, num_of_rows)
+    
+    if not items:
+        return json.dumps({
+            "success": False,
+            "error": f"Statistics not found for code {npay_cd}"
+        }, ensure_ascii=False)
+    
+    # Check if target is in first page
+    for item in items:
+        if item.get("npayCd") == npay_cd:
+            found_stat = item
+            break
+    else:
         found_stat = None
-        page_no = 1
-        num_of_rows = 100
-        max_pages = 50  # Safety limit
-        total_pages = None
+    
+    # If not found in first page, use binary search
+    if not found_stat and total_count:
+        total_pages = math.ceil(total_count / num_of_rows)
+        max_pages = min(total_pages, 50)  # Safety limit
         
-        while True:
-            items, total_count = await get_non_payment_item_sido_cd_list(page_no, num_of_rows)
-            if not items:
+        # Binary search
+        left = 1
+        right = max_pages
+        max_iterations = 15  # Limit binary search iterations to prevent infinite loops
+        
+        iteration = 0
+        while left <= right and iteration < max_iterations:
+            iteration += 1
+            mid = (left + right) // 2
+            mid_items, _ = await get_non_payment_item_sido_cd_list(mid, num_of_rows)
+            
+            if not mid_items:
                 break
             
-            # Calculate total pages from first response if available
-            if total_count is not None and total_pages is None:
-                total_pages = math.ceil(total_count / num_of_rows)
-                # Use the smaller of calculated pages or safety limit
-                max_pages = min(total_pages, max_pages)
+            # Get first and last npayCd in this page
+            first_code = mid_items[0].get("npayCd", "")
+            last_code = mid_items[-1].get("npayCd", "")
             
-            # Find matching code in current page
-            for item in items:
-                if item.get("npayCd") == npay_cd:
-                    found_stat = item
-                    break  # Found, exit inner loop
-            
-            # If found, exit outer loop
-            if found_stat:
+            # Check if target is in current page
+            if first_code <= npay_cd <= last_code:
+                # Search in current page
+                for item in mid_items:
+                    if item.get("npayCd") == npay_cd:
+                        found_stat = item
+                        break
                 break
-            
-            # Check if we've reached the end
-            if len(items) < num_of_rows:
-                break
-            
-            page_no += 1
-            if page_no > max_pages:
-                break
+            elif npay_cd < first_code:
+                right = mid - 1
+            else:  # npay_cd > last_code
+                left = mid + 1
         
         if not found_stat:
             return json.dumps({
@@ -115,7 +142,37 @@ async def stats_by_region(npay_cd: str) -> str:
         }
         
         return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+async def stats_by_region(npay_cd: str) -> str:
+    """
+    Get price statistics by region for a non-payment item
     
+    Args:
+        npay_cd: Non-payment code
+        
+    Returns:
+        JSON string with regional statistics
+    """
+    try:
+        # Wrap with timeout
+        result = await asyncio.wait_for(
+            _stats_by_region_impl(npay_cd),
+            timeout=STATS_OPERATION_TIMEOUT
+        )
+        
+        # Cache successful results
+        if result and '"success":true' in result:
+            cache_key = f"region_{npay_cd}"
+            import time
+            _stats_cache[cache_key] = (result, time.time())
+        
+        return result
+    except asyncio.TimeoutError:
+        return json.dumps({
+            "success": False,
+            "error": f"Request timeout: Statistics lookup for code {npay_cd} took too long. Please try again later."
+        }, ensure_ascii=False)
     except Exception as e:
         return json.dumps({
             "success": False,
@@ -123,52 +180,71 @@ async def stats_by_region(npay_cd: str) -> str:
         }, ensure_ascii=False)
 
 
-async def stats_by_hospital_type(npay_cd: str) -> str:
+async def _stats_by_hospital_type_impl(npay_cd: str) -> str:
     """
-    Get price statistics by hospital type
+    Internal implementation of stats_by_hospital_type (without timeout wrapper)
+    """
+    # Check cache first
+    cache_key = f"hospital_type_{npay_cd}"
+    if cache_key in _stats_cache:
+        cached_data, cached_time = _stats_cache[cache_key]
+        import time
+        if time.time() - cached_time < CACHE_TTL:
+            return cached_data
     
-    Args:
-        npay_cd: Non-payment code
-        
-    Returns:
-        JSON string with hospital type statistics
-    """
-    try:
-        # Get hospital type statistics
+    # Get first page to determine total pages
+    num_of_rows = 100
+    items, total_count = await get_non_payment_item_clcd_list(1, num_of_rows)
+    
+    if not items:
+        return json.dumps({
+            "success": False,
+            "error": f"Statistics not found for code {npay_cd}"
+        }, ensure_ascii=False)
+    
+    # Check if target is in first page
+    for item in items:
+        if item.get("npayCd") == npay_cd:
+            found_stat = item
+            break
+    else:
         found_stat = None
-        page_no = 1
-        num_of_rows = 100
-        max_pages = 50  # Safety limit
-        total_pages = None
+    
+    # If not found in first page, use binary search
+    if not found_stat and total_count:
+        total_pages = math.ceil(total_count / num_of_rows)
+        max_pages = min(total_pages, 50)  # Safety limit
         
-        while True:
-            items, total_count = await get_non_payment_item_clcd_list(page_no, num_of_rows)
-            if not items:
+        # Binary search
+        left = 1
+        right = max_pages
+        max_iterations = 15  # Limit binary search iterations to prevent infinite loops
+        
+        iteration = 0
+        while left <= right and iteration < max_iterations:
+            iteration += 1
+            mid = (left + right) // 2
+            mid_items, _ = await get_non_payment_item_clcd_list(mid, num_of_rows)
+            
+            if not mid_items:
                 break
             
-            # Calculate total pages from first response if available
-            if total_count is not None and total_pages is None:
-                total_pages = math.ceil(total_count / num_of_rows)
-                # Use the smaller of calculated pages or safety limit
-                max_pages = min(total_pages, max_pages)
+            # Get first and last npayCd in this page
+            first_code = mid_items[0].get("npayCd", "")
+            last_code = mid_items[-1].get("npayCd", "")
             
-            # Find matching code in current page
-            for item in items:
-                if item.get("npayCd") == npay_cd:
-                    found_stat = item
-                    break  # Found, exit inner loop
-            
-            # If found, exit outer loop
-            if found_stat:
+            # Check if target is in current page
+            if first_code <= npay_cd <= last_code:
+                # Search in current page
+                for item in mid_items:
+                    if item.get("npayCd") == npay_cd:
+                        found_stat = item
+                        break
                 break
-            
-            # Check if we've reached the end
-            if len(items) < num_of_rows:
-                break
-            
-            page_no += 1
-            if page_no > max_pages:
-                break
+            elif npay_cd < first_code:
+                right = mid - 1
+            else:  # npay_cd > last_code
+                left = mid + 1
         
         if not found_stat:
             return json.dumps({
@@ -215,7 +291,37 @@ async def stats_by_hospital_type(npay_cd: str) -> str:
         }
         
         return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+async def stats_by_hospital_type(npay_cd: str) -> str:
+    """
+    Get price statistics by hospital type
     
+    Args:
+        npay_cd: Non-payment code
+        
+    Returns:
+        JSON string with hospital type statistics
+    """
+    try:
+        # Wrap with timeout
+        result = await asyncio.wait_for(
+            _stats_by_hospital_type_impl(npay_cd),
+            timeout=STATS_OPERATION_TIMEOUT
+        )
+        
+        # Cache successful results
+        if result and '"success":true' in result:
+            cache_key = f"hospital_type_{npay_cd}"
+            import time
+            _stats_cache[cache_key] = (result, time.time())
+        
+        return result
+    except asyncio.TimeoutError:
+        return json.dumps({
+            "success": False,
+            "error": f"Request timeout: Statistics lookup for code {npay_cd} took too long. Please try again later."
+        }, ensure_ascii=False)
     except Exception as e:
         return json.dumps({
             "success": False,
