@@ -349,11 +349,25 @@ async def stats_outlier_detect(
         # Get hospital price range
         from src.tools.hospital_tools import hospital_price_range
         price_range_result = await hospital_price_range(hospital, npay_cd)
+        
+        if not price_range_result:
+            return json.dumps({
+                "success": False,
+                "error": "Failed to get hospital price range information"
+            }, ensure_ascii=False)
+        
         price_range_data = json.loads(price_range_result)
         
         if not price_range_data.get("success"):
             # Try to get regional statistics instead
             region_stats_result = await stats_by_region(npay_cd)
+            
+            if not region_stats_result:
+                return json.dumps({
+                    "success": False,
+                    "error": "Cannot determine if price is outlier: insufficient data"
+                }, ensure_ascii=False)
+            
             region_stats_data = json.loads(region_stats_result)
             
             if not region_stats_data.get("success"):

@@ -96,6 +96,12 @@ async def hospital_search(
             cl_cd_nm = item.get("clCdNm", "")
             min_prc = item.get("minPrc", "")
             max_prc = item.get("maxPrc", "")
+            sido_cd_nm = item.get("sidoCdNm", "")
+            
+            # Filter by city/province if specified
+            if sido:
+                if sido not in sido_cd_nm:
+                    continue
             
             # Filter by district if specified
             if sggu:
