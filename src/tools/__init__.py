@@ -40,6 +40,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="SearchNonPaymentCode",
             description="""🔍 비급여 항목 코드 검색 - 키워드로 비급여 항목 코드를 검색하여 매칭되는 코드와 카테고리 정보를 반환
+
 📍 사용 시나리오:
 - 특정 키워드로 비급여 항목 코드 찾기
 - 검색 결과에서 정확한 코드 확인 후 다른 도구 사용
@@ -49,10 +50,6 @@ def get_all_tools() -> list[Tool]:
 - "1인실 비급여 코드 찾아줘" → 키워드로 검색
 - "MRI 검사 비급여 항목" → 관련 코드 검색
 - 사용자가 항목명만 알고 있을 때 → 코드를 찾기 위해 먼저 호출
-
-⚠️ 주의사항:
-- 검색 결과는 최대 10개까지만 반환됨
-- date 파라미터는 선택사항이며, 특정 날짜 기준 유효성 검증 시 사용
 
 Args:
 keyword: 검색 키워드 (예: '1인실', 'MRI')
@@ -78,6 +75,7 @@ Returns:
         Tool(
             name="GetNonPaymentCodeHierarchy",
             description="""📊 비급여 코드 분류 체계 조회 - 비급여 코드의 대분류, 중분류, 소분류 정보를 반환
+
 📍 사용 시나리오:
 - 비급여 항목의 카테고리 구조 파악
 - 코드의 상위/하위 분류 확인
@@ -111,6 +109,7 @@ Returns:
         Tool(
             name="ExplainNonPaymentCode",
             description="""📝 비급여 코드 설명 조회 - 비급여 코드를 환자가 이해하기 쉬운 언어로 설명
+
 📍 사용 시나리오:
 - 환자에게 비급여 항목이 무엇인지 설명
 - 코드의 의미를 일반인도 이해할 수 있게 전달
@@ -144,6 +143,7 @@ Returns:
         Tool(
             name="ValidateNonPaymentCode",
             description="""✅ 비급여 코드 유효성 검증 - 특정 날짜 기준으로 비급여 코드의 유효성과 만료일 확인
+
 📍 사용 시나리오:
 - 특정 날짜에 코드가 유효한지 확인
 - 코드의 유효기간 확인
@@ -184,6 +184,7 @@ Returns:
         Tool(
             name="SearchNonPaymentHospitals",
             description="""🏥 비급여 항목 제공 병원 검색 - 특정 비급여 항목을 제공하는 병원 목록을 지역 및 병원 유형으로 필터링하여 검색
+
 📍 사용 시나리오:
 - 특정 비급여 항목을 제공하는 병원 찾기
 - 지역별/병원 유형별 병원 목록 확인
@@ -233,6 +234,7 @@ Returns:
         Tool(
             name="GetHospitalPriceRange",
             description="""💰 병원별 비급여 항목 가격 범위 조회 - 특정 병원의 특정 비급여 항목에 대한 최소/최대 가격 조회
+
 📍 사용 시나리오:
 - 특정 병원의 비급여 항목 가격 범위 확인
 - 병원별 가격 비교 전 기본 정보 수집
@@ -271,6 +273,7 @@ Returns:
         Tool(
             name="CompareHospitalPrices",
             description="""📊 지역별 병원 가격 비교 - 같은 지역 내 병원들의 비급여 항목 가격을 비교하여 최저가, 최고가, 중간가 반환
+
 📍 사용 시나리오:
 - 특정 지역 내 병원 간 가격 비교
 - 가장 저렴한 병원 찾기
@@ -316,6 +319,7 @@ Returns:
         Tool(
             name="GetNonPaymentStatsByRegion",
             description="""📈 지역별 비급여 항목 통계 조회 - 비급여 항목의 지역별 평균, 최소, 최대 가격 통계 조회
+
 📍 사용 시나리오:
 - 전국 지역별 가격 분포 파악
 - 지역 간 가격 차이 확인
@@ -350,6 +354,7 @@ Returns:
         Tool(
             name="GetNonPaymentStatsByHospitalType",
             description="""🏥 병원 유형별 비급여 항목 통계 조회 - 병원 유형별(상급종합, 종합병원, 병원 등) 평균, 최소, 최대 가격 통계 조회
+
 📍 사용 시나리오:
 - 병원 유형별 가격 차이 파악
 - 어떤 병원 유형이 저렴한지 확인
@@ -384,6 +389,7 @@ Returns:
         Tool(
             name="DetectPriceOutlier",
             description="""⚠️ 병원 가격 이상치 탐지 - 특정 병원의 비급여 항목 가격이 정상 범위를 벗어났는지 확인
+
 📍 사용 시나리오:
 - 병원에서 제시한 가격이 비정상적으로 높거나 낮은지 확인
 - 가격 검증이 필요할 때
@@ -429,6 +435,7 @@ Returns:
         Tool(
             name="FindCheapestOption",
             description="""💵 지역별 최저가 옵션 찾기 - 특정 지역에서 해당 비급여 항목을 가장 저렴하게 제공하는 병원 찾기
+
 📍 사용 시나리오:
 - 특정 지역에서 가장 저렴한 병원 찾기
 - 가격 중심으로 병원 선택
@@ -473,6 +480,7 @@ Returns:
         Tool(
             name="CheckReasonablePrice",
             description="""💡 가격 합리성 판단 - 제시된 가격이 합리적인지 지역 평균 또는 전체 평균과 비교하여 판단
+
 📍 사용 시나리오:
 - 병원에서 제시한 가격이 합리적인지 확인
 - 가격 협상 전 기준 확인
@@ -519,6 +527,7 @@ Returns:
         Tool(
             name="GenerateExplanationReport",
             description="""📋 비급여 항목 종합 설명 보고서 생성 - 환자가 이해하기 쉬운 비급여 항목에 대한 종합 정보 제공
+            
 📍 사용 시나리오:
 - 비급여 항목에 대한 종합적인 정보 제공
 - 환자에게 비급여 항목 선택 가이드 제공
