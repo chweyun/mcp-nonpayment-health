@@ -105,33 +105,39 @@ async def code_hierarchy(npay_cd: str) -> str:
     """
     try:
         # Search for the code
-        all_items = []
+        found_item = None
         page_no = 1
         num_of_rows = 100
+        max_pages = 50  # Increased limit to search more pages
         
-        while True:
+        while page_no <= max_pages:
             items = await get_non_payment_item_code_list2(page_no, num_of_rows)
             if not items:
                 break
             
+            # Search for the code in current page
             for item in items:
                 if item.get("npayCd") == npay_cd:
-                    all_items.append(item)
+                    found_item = item
+                    break  # Found, exit inner loop
             
+            # If found, exit outer loop
+            if found_item:
+                break
+            
+            # If this page has fewer items than requested, we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
-            if page_no > 10:
-                break
         
-        if not all_items:
+        if not found_item:
             return json.dumps({
                 "success": False,
                 "error": f"Code {npay_cd} not found"
             }, ensure_ascii=False)
         
-        item = all_items[0]
+        item = found_item
         
         result = {
             "success": True,
@@ -226,34 +232,40 @@ async def code_validate(npay_cd: str, date: str) -> str:
         check_date = datetime.strptime(date, "%Y-%m-%d")
         
         # Search for the code
-        all_items = []
+        found_item = None
         page_no = 1
         num_of_rows = 100
+        max_pages = 50  # Increased limit to search more pages
         
-        while True:
+        while page_no <= max_pages:
             items = await get_non_payment_item_code_list2(page_no, num_of_rows)
             if not items:
                 break
             
+            # Search for the code in current page
             for item in items:
                 if item.get("npayCd") == npay_cd:
-                    all_items.append(item)
+                    found_item = item
+                    break  # Found, exit inner loop
             
+            # If found, exit outer loop
+            if found_item:
+                break
+            
+            # If this page has fewer items than requested, we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
-            if page_no > 10:
-                break
         
-        if not all_items:
+        if not found_item:
             return json.dumps({
                 "success": False,
                 "isValid": False,
                 "error": f"Code {npay_cd} not found"
             }, ensure_ascii=False)
         
-        item = all_items[0]
+        item = found_item
         adt_fr_dd = item.get("adtFrDd", "")
         adt_end_dd = item.get("adtEndDd", "")
         
