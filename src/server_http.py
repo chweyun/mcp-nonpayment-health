@@ -189,35 +189,35 @@ async def messages_endpoint(request: Request):
                 result_text = None
                 
                 # Code management tools
-                if tool_name == "nonpayment.code.search":
+                if tool_name == "SearchNonPaymentCode":
                     result_text = await code_search(
                         tool_args.get("keyword"),
                         tool_args.get("date")
                     )
-                elif tool_name == "nonpayment.code.hierarchy":
+                elif tool_name == "GetNonPaymentCodeHierarchy":
                     result_text = await code_hierarchy(tool_args.get("npayCd"))
-                elif tool_name == "nonpayment.code.explain":
+                elif tool_name == "ExplainNonPaymentCode":
                     result_text = await code_explain(tool_args.get("npayCd"))
-                elif tool_name == "nonpayment.code.validate":
+                elif tool_name == "ValidateNonPaymentCode":
                     result_text = await code_validate(
                         tool_args.get("npayCd"),
                         tool_args.get("date")
                     )
                 
                 # Hospital information tools
-                elif tool_name == "nonpayment.hospital.search":
+                elif tool_name == "SearchNonPaymentHospitals":
                     result_text = await hospital_search(
                         tool_args.get("npayCd"),
                         tool_args.get("sido"),
                         tool_args.get("sggu"),
                         tool_args.get("clCd")
                     )
-                elif tool_name == "nonpayment.hospital.price-range":
+                elif tool_name == "GetHospitalPriceRange":
                     result_text = await hospital_price_range(
                         tool_args.get("hospital"),
                         tool_args.get("npayCd")
                     )
-                elif tool_name == "nonpayment.hospital.compare":
+                elif tool_name == "CompareHospitalPrices":
                     result_text = await hospital_compare(
                         tool_args.get("npayCd"),
                         tool_args.get("sido"),
@@ -225,11 +225,11 @@ async def messages_endpoint(request: Request):
                     )
                 
                 # Statistical analysis tools
-                elif tool_name == "nonpayment.stats.by-region":
+                elif tool_name == "GetNonPaymentStatsByRegion":
                     result_text = await stats_by_region(tool_args.get("npayCd"))
-                elif tool_name == "nonpayment.stats.by-hospital-type":
+                elif tool_name == "GetNonPaymentStatsByHospitalType":
                     result_text = await stats_by_hospital_type(tool_args.get("npayCd"))
-                elif tool_name == "nonpayment.stats.outlier-detect":
+                elif tool_name == "DetectPriceOutlier":
                     result_text = await stats_outlier_detect(
                         tool_args.get("hospital"),
                         tool_args.get("npayCd"),
@@ -237,19 +237,19 @@ async def messages_endpoint(request: Request):
                     )
                 
                 # Decision support tools
-                elif tool_name == "nonpayment.decision.cheapest-option":
+                elif tool_name == "FindCheapestOption":
                     result_text = await decision_cheapest_option(
                         tool_args.get("npayCd"),
                         tool_args.get("sido"),
                         tool_args.get("sggu")
                     )
-                elif tool_name == "nonpayment.decision.reasonable-price":
+                elif tool_name == "CheckReasonablePrice":
                     result_text = await decision_reasonable_price(
                         tool_args.get("npayCd"),
                         tool_args.get("price"),
                         tool_args.get("sido")
                     )
-                elif tool_name == "nonpayment.decision.explanation-report":
+                elif tool_name == "GenerateExplanationReport":
                     result_text = await decision_explanation_report(
                         tool_args.get("npayCd"),
                         tool_args.get("sido")

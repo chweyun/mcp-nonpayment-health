@@ -38,7 +38,7 @@ def get_all_tools() -> list[Tool]:
     return [
         # Code management tools
         Tool(
-            name="nonpayment.code.search",
+            name="SearchNonPaymentCode",
             description="Search for non-payment item codes by keyword. Returns matching codes with category information.",
             inputSchema={
                 "type": "object",
@@ -56,7 +56,7 @@ def get_all_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="nonpayment.code.hierarchy",
+            name="GetNonPaymentCodeHierarchy",
             description="Get classification hierarchy for a non-payment code. Returns major, middle, and sub categories.",
             inputSchema={
                 "type": "object",
@@ -70,7 +70,7 @@ def get_all_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="nonpayment.code.explain",
+            name="ExplainNonPaymentCode",
             description="Get plain-language explanation for a non-payment code. Helps patients understand what the code means.",
             inputSchema={
                 "type": "object",
@@ -84,7 +84,7 @@ def get_all_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="nonpayment.code.validate",
+            name="ValidateNonPaymentCode",
             description="Validate code validity and expiration date. Checks if a code is valid for a specific date.",
             inputSchema={
                 "type": "object",
@@ -103,7 +103,7 @@ def get_all_tools() -> list[Tool]:
         ),
         # Hospital information tools
         Tool(
-            name="nonpayment.hospital.search",
+            name="SearchNonPaymentHospitals",
             description="Search for hospitals offering specific non-payment items. Filter by region and hospital type.",
             inputSchema={
                 "type": "object",
@@ -129,7 +129,7 @@ def get_all_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="nonpayment.hospital.price-range",
+            name="GetHospitalPriceRange",
             description="Get price range for a specific item at a hospital. Returns minimum and maximum prices.",
             inputSchema={
                 "type": "object",
@@ -147,7 +147,7 @@ def get_all_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="nonpayment.hospital.compare",
+            name="CompareHospitalPrices",
             description="Compare prices across hospitals in the same region. Returns cheapest, most expensive, and median prices.",
             inputSchema={
                 "type": "object",
@@ -170,7 +170,7 @@ def get_all_tools() -> list[Tool]:
         ),
         # Statistical analysis tools
         Tool(
-            name="nonpayment.stats.by-region",
+            name="GetNonPaymentStatsByRegion",
             description="Get price statistics by region for a non-payment item. Returns average, min, and max prices per region.",
             inputSchema={
                 "type": "object",
@@ -184,7 +184,7 @@ def get_all_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="nonpayment.stats.by-hospital-type",
+            name="GetNonPaymentStatsByHospitalType",
             description="Get price statistics by hospital type. Compares prices across different hospital types.",
             inputSchema={
                 "type": "object",
@@ -198,7 +198,7 @@ def get_all_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="nonpayment.stats.outlier-detect",
+            name="DetectPriceOutlier",
             description="Detect if a hospital's price is abnormally high or low. Compares against regional or hospital-specific averages.",
             inputSchema={
                 "type": "object",
@@ -221,7 +221,7 @@ def get_all_tools() -> list[Tool]:
         ),
         # Decision support tools
         Tool(
-            name="nonpayment.decision.cheapest-option",
+            name="FindCheapestOption",
             description="Find the cheapest option based on location. Returns the most affordable hospital in the specified region.",
             inputSchema={
                 "type": "object",
@@ -243,7 +243,7 @@ def get_all_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="nonpayment.decision.reasonable-price",
+            name="CheckReasonablePrice",
             description="Determine if a price is reasonable. Compares against regional or overall averages.",
             inputSchema={
                 "type": "object",
@@ -265,7 +265,7 @@ def get_all_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="nonpayment.decision.explanation-report",
+            name="GenerateExplanationReport",
             description="Generate a patient-friendly explanation report. Provides comprehensive information about a non-payment item.",
             inputSchema={
                 "type": "object",
@@ -300,254 +300,7 @@ def register_tools(server: Server):
         Returns:
             list[Tool]: List of available tools
         """
-        return [
-            # Code management tools
-            Tool(
-                name="nonpayment.code.search",
-                description="Search for non-payment item codes by keyword. Returns matching codes with category information.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "keyword": {
-                            "type": "string",
-                            "description": "Search keyword (e.g., '1인실', 'MRI')"
-                        },
-                        "date": {
-                            "type": "string",
-                            "description": "Date for validation (YYYY-MM-DD format, optional)"
-                        }
-                    },
-                    "required": ["keyword"]
-                }
-            ),
-            Tool(
-                name="nonpayment.code.hierarchy",
-                description="Get classification hierarchy for a non-payment code. Returns major, middle, and sub categories.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        }
-                    },
-                    "required": ["npayCd"]
-                }
-            ),
-            Tool(
-                name="nonpayment.code.explain",
-                description="Get plain-language explanation for a non-payment code. Helps patients understand what the code means.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        }
-                    },
-                    "required": ["npayCd"]
-                }
-            ),
-            Tool(
-                name="nonpayment.code.validate",
-                description="Validate code validity and expiration date. Checks if a code is valid for a specific date.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        },
-                        "date": {
-                            "type": "string",
-                            "description": "Date to check (YYYY-MM-DD format)"
-                        }
-                    },
-                    "required": ["npayCd", "date"]
-                }
-            ),
-            # Hospital information tools
-            Tool(
-                name="nonpayment.hospital.search",
-                description="Search for hospitals offering specific non-payment items. Filter by region and hospital type.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        },
-                        "sido": {
-                            "type": "string",
-                            "description": "City/Province name (e.g., '서울', '부산')"
-                        },
-                        "sggu": {
-                            "type": "string",
-                            "description": "District name (optional)"
-                        },
-                        "clCd": {
-                            "type": "string",
-                            "description": "Hospital type code or name (e.g., '상급종합', '종합병원')"
-                        }
-                    },
-                    "required": ["npayCd"]
-                }
-            ),
-            Tool(
-                name="nonpayment.hospital.price-range",
-                description="Get price range for a specific item at a hospital. Returns minimum and maximum prices.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "hospital": {
-                            "type": "string",
-                            "description": "Hospital name"
-                        },
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        }
-                    },
-                    "required": ["hospital", "npayCd"]
-                }
-            ),
-            Tool(
-                name="nonpayment.hospital.compare",
-                description="Compare prices across hospitals in the same region. Returns cheapest, most expensive, and median prices.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        },
-                        "sido": {
-                            "type": "string",
-                            "description": "City/Province name"
-                        },
-                        "sggu": {
-                            "type": "string",
-                            "description": "District name (optional)"
-                        }
-                    },
-                    "required": ["npayCd", "sido"]
-                }
-            ),
-            # Statistical analysis tools
-            Tool(
-                name="nonpayment.stats.by-region",
-                description="Get price statistics by region for a non-payment item. Returns average, min, and max prices per region.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        }
-                    },
-                    "required": ["npayCd"]
-                }
-            ),
-            Tool(
-                name="nonpayment.stats.by-hospital-type",
-                description="Get price statistics by hospital type. Compares prices across different hospital types.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        }
-                    },
-                    "required": ["npayCd"]
-                }
-            ),
-            Tool(
-                name="nonpayment.stats.outlier-detect",
-                description="Detect if a hospital's price is abnormally high or low. Compares against regional or hospital-specific averages.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "hospital": {
-                            "type": "string",
-                            "description": "Hospital name"
-                        },
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        },
-                        "price": {
-                            "type": "number",
-                            "description": "Price to check"
-                        }
-                    },
-                    "required": ["hospital", "npayCd", "price"]
-                }
-            ),
-            # Decision support tools
-            Tool(
-                name="nonpayment.decision.cheapest-option",
-                description="Find the cheapest option based on location. Returns the most affordable hospital in the specified region.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        },
-                        "sido": {
-                            "type": "string",
-                            "description": "City/Province name"
-                        },
-                        "sggu": {
-                            "type": "string",
-                            "description": "District name (optional)"
-                        }
-                    },
-                    "required": ["npayCd", "sido"]
-                }
-            ),
-            Tool(
-                name="nonpayment.decision.reasonable-price",
-                description="Determine if a price is reasonable. Compares against regional or overall averages.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        },
-                        "price": {
-                            "type": "number",
-                            "description": "Price to check"
-                        },
-                        "sido": {
-                            "type": "string",
-                            "description": "City/Province name (optional, for regional comparison)"
-                        }
-                    },
-                    "required": ["npayCd", "price"]
-                }
-            ),
-            Tool(
-                name="nonpayment.decision.explanation-report",
-                description="Generate a patient-friendly explanation report. Provides comprehensive information about a non-payment item.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "npayCd": {
-                            "type": "string",
-                            "description": "Non-payment code"
-                        },
-                        "sido": {
-                            "type": "string",
-                            "description": "City/Province name (optional)"
-                        }
-                    },
-                    "required": ["npayCd"]
-                }
-            )
-        ]
+        return get_all_tools()
 
     @server.call_tool()
     async def handle_call_tool(name: str, arguments: dict) -> list[TextContent]:
@@ -563,72 +316,72 @@ def register_tools(server: Server):
         """
         try:
             # Code management tools
-            if name == "nonpayment.code.search":
+            if name == "SearchNonPaymentCode":
                 keyword = arguments.get("keyword")
                 date = arguments.get("date")
                 result = await code_search(keyword, date)
             
-            elif name == "nonpayment.code.hierarchy":
+            elif name == "GetNonPaymentCodeHierarchy":
                 npay_cd = arguments.get("npayCd")
                 result = await code_hierarchy(npay_cd)
             
-            elif name == "nonpayment.code.explain":
+            elif name == "ExplainNonPaymentCode":
                 npay_cd = arguments.get("npayCd")
                 result = await code_explain(npay_cd)
             
-            elif name == "nonpayment.code.validate":
+            elif name == "ValidateNonPaymentCode":
                 npay_cd = arguments.get("npayCd")
                 date = arguments.get("date")
                 result = await code_validate(npay_cd, date)
             
             # Hospital information tools
-            elif name == "nonpayment.hospital.search":
+            elif name == "SearchNonPaymentHospitals":
                 npay_cd = arguments.get("npayCd")
                 sido = arguments.get("sido")
                 sggu = arguments.get("sggu")
                 cl_cd = arguments.get("clCd")
                 result = await hospital_search(npay_cd, sido, sggu, cl_cd)
             
-            elif name == "nonpayment.hospital.price-range":
+            elif name == "GetHospitalPriceRange":
                 hospital = arguments.get("hospital")
                 npay_cd = arguments.get("npayCd")
                 result = await hospital_price_range(hospital, npay_cd)
             
-            elif name == "nonpayment.hospital.compare":
+            elif name == "CompareHospitalPrices":
                 npay_cd = arguments.get("npayCd")
                 sido = arguments.get("sido")
                 sggu = arguments.get("sggu")
                 result = await hospital_compare(npay_cd, sido, sggu)
             
             # Statistical analysis tools
-            elif name == "nonpayment.stats.by-region":
+            elif name == "GetNonPaymentStatsByRegion":
                 npay_cd = arguments.get("npayCd")
                 result = await stats_by_region(npay_cd)
             
-            elif name == "nonpayment.stats.by-hospital-type":
+            elif name == "GetNonPaymentStatsByHospitalType":
                 npay_cd = arguments.get("npayCd")
                 result = await stats_by_hospital_type(npay_cd)
             
-            elif name == "nonpayment.stats.outlier-detect":
+            elif name == "DetectPriceOutlier":
                 hospital = arguments.get("hospital")
                 npay_cd = arguments.get("npayCd")
                 price = arguments.get("price")
                 result = await stats_outlier_detect(hospital, npay_cd, price)
             
             # Decision support tools
-            elif name == "nonpayment.decision.cheapest-option":
+            elif name == "FindCheapestOption":
                 npay_cd = arguments.get("npayCd")
                 sido = arguments.get("sido")
                 sggu = arguments.get("sggu")
                 result = await decision_cheapest_option(npay_cd, sido, sggu)
             
-            elif name == "nonpayment.decision.reasonable-price":
+            elif name == "CheckReasonablePrice":
                 npay_cd = arguments.get("npayCd")
                 price = arguments.get("price")
                 sido = arguments.get("sido")
                 result = await decision_reasonable_price(npay_cd, price, sido)
             
-            elif name == "nonpayment.decision.explanation-report":
+            elif name == "GenerateExplanationReport":
                 npay_cd = arguments.get("npayCd")
                 sido = arguments.get("sido")
                 result = await decision_explanation_report(npay_cd, sido)
