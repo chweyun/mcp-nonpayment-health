@@ -244,9 +244,24 @@ async def messages_endpoint(request: Request):
                         tool_args.get("sggu")
                     )
                 elif tool_name == "CheckReasonablePrice":
+                    price = tool_args.get("price")
+                    # Convert price to float if it's a number
+                    if price is not None:
+                        try:
+                            price = float(price)
+                        except (ValueError, TypeError):
+                            response = {
+                                "jsonrpc": "2.0",
+                                "id": request_id,
+                                "error": {
+                                    "code": -32602,
+                                    "message": "Invalid price parameter"
+                                }
+                            }
+                            return JSONResponse(content=response, status_code=400)
                     result_text = await decision_reasonable_price(
                         tool_args.get("npayCd"),
-                        tool_args.get("price"),
+                        price,
                         tool_args.get("sido")
                     )
                 elif tool_name == "GenerateExplanationReport":

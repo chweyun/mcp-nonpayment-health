@@ -23,34 +23,39 @@ async def stats_by_region(npay_cd: str) -> str:
     """
     try:
         # Get regional statistics
-        all_stats = []
+        found_stat = None
         page_no = 1
         num_of_rows = 100
+        max_pages = 50  # Increased limit to search more pages
         
-        while True:
+        while page_no <= max_pages:
             items = await get_non_payment_item_sido_cd_list(page_no, num_of_rows)
             if not items:
                 break
             
-            # Find matching code
+            # Find matching code in current page
             for item in items:
                 if item.get("npayCd") == npay_cd:
-                    all_stats.append(item)
+                    found_stat = item
+                    break  # Found, exit inner loop
             
+            # If found, exit outer loop
+            if found_stat:
+                break
+            
+            # If this page has fewer items than requested, we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
-            if page_no > 10:
-                break
         
-        if not all_stats:
+        if not found_stat:
             return json.dumps({
                 "success": False,
                 "error": f"Statistics not found for code {npay_cd}"
             }, ensure_ascii=False)
         
-        stat = all_stats[0]
+        stat = found_stat
         
         # Map region codes to names
         regions = {}
@@ -120,34 +125,39 @@ async def stats_by_hospital_type(npay_cd: str) -> str:
     """
     try:
         # Get hospital type statistics
-        all_stats = []
+        found_stat = None
         page_no = 1
         num_of_rows = 100
+        max_pages = 50  # Increased limit to search more pages
         
-        while True:
+        while page_no <= max_pages:
             items = await get_non_payment_item_clcd_list(page_no, num_of_rows)
             if not items:
                 break
             
-            # Find matching code
+            # Find matching code in current page
             for item in items:
                 if item.get("npayCd") == npay_cd:
-                    all_stats.append(item)
+                    found_stat = item
+                    break  # Found, exit inner loop
             
+            # If found, exit outer loop
+            if found_stat:
+                break
+            
+            # If this page has fewer items than requested, we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
-            if page_no > 10:
-                break
         
-        if not all_stats:
+        if not found_stat:
             return json.dumps({
                 "success": False,
                 "error": f"Statistics not found for code {npay_cd}"
             }, ensure_ascii=False)
         
-        stat = all_stats[0]
+        stat = found_stat
         
         # Map hospital type codes to names
         hospital_types = {}
