@@ -25,7 +25,6 @@ EXPOSE 8000
 ENV PORT=8000
 ENV HOST=0.0.0.0
 ENV DEBUG=False
-ENV API_PREFIX=/nonpayment-health
 
 # Run the server
 CMD ["python", "run_server.py"]

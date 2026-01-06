@@ -53,11 +53,6 @@ DATA_GO_KR_API_KEY=your_api_key_here
 PORT=8000                    # 서버 포트 (기본값: 8000)
 HOST=0.0.0.0                 # 서버 호스트 (기본값: 0.0.0.0)
 DEBUG=False                  # 디버그 모드 (기본값: False)
-
-# API 경로 prefix (선택)
-# 같은 서버에 여러 MCP 서버를 호스팅할 때 사용
-# 기본값: /nonpayment-health
-API_PREFIX=/nonpayment-health
 ```
 
 #### 환경 변수 설명
@@ -68,7 +63,6 @@ API_PREFIX=/nonpayment-health
 | `PORT` | ❌ | `8000` | 서버가 사용할 포트 번호 |
 | `HOST` | ❌ | `0.0.0.0` | 서버가 바인딩할 호스트 주소 |
 | `DEBUG` | ❌ | `False` | 디버그 모드 활성화 (`True`/`False`) |
-| `API_PREFIX` | ❌ | `/nonpayment-health` | API 엔드포인트 경로 prefix |
 
 ### MCP 서버 실행
 
@@ -113,7 +107,6 @@ docker build -t nonpayment-health-mcp .
 docker run -d \
   -p 8001:8000 \
   -e DATA_GO_KR_API_KEY=your_api_key_here \
-  -e API_PREFIX=/nonpayment-health \
   --name nonpayment-health-mcp \
   nonpayment-health-mcp
 ```
@@ -286,11 +279,6 @@ docker run -d \
 **참고:** 같은 서버에 여러 MCP 서버를 호스팅하는 경우, 각 서버는 다른 API 경로를 사용합니다:
 - `mcp-link-scan`: `/messages` 또는 `/link-scan/messages`
 - `mcp-nonpayment-health`: `/nonpayment-health/messages`
-
-환경 변수 `API_PREFIX`를 설정하여 경로를 변경할 수 있습니다:
-```bash
-API_PREFIX=/custom-path
-```
 
 ## 📄 라이선스
 

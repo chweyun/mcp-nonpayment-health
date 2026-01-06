@@ -42,10 +42,6 @@ from mcp.types import TextContent
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# API prefix for multi-server hosting
-# Set to empty string if reverse proxy handles the path
-API_PREFIX = os.getenv("API_PREFIX", "")
-
 # Create MCP server instance
 mcp_server = Server("nonpayment-health")
 
@@ -89,18 +85,17 @@ async def root():
         "status": "running",
         "description": "Remote MCP Server for non-payment medical expense information",
         "mcp_version": "2025-03-26",
-        "api_prefix": API_PREFIX,
-        "endpoint": f"{API_PREFIX}/messages"
+        "endpoint": "/messages"
     }
 
 
-@app.get(f"{API_PREFIX}/health")
+@app.get("/health")
 async def health():
     """Health check endpoint"""
     return {"status": "healthy", "service": "nonpayment-health"}
 
 
-@app.post(f"{API_PREFIX}/messages")
+@app.post("/messages")
 async def messages_endpoint(request: Request):
     """
     MCP protocol messages endpoint
