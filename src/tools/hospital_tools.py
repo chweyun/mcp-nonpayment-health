@@ -2,6 +2,7 @@
 Hospital information tools for non-payment items
 """
 import json
+import math
 from typing import Dict, Any, List, Optional
 from src.utils.api_client import (
     get_non_payment_item_hosp_list2,
@@ -56,9 +57,11 @@ async def hospital_search(
         all_hospitals = []
         page_no = 1
         num_of_rows = 100
+        max_pages = 50  # Safety limit
+        total_pages = None
         
         while True:
-            items = await get_non_payment_item_hosp_list2(
+            items, total_count = await get_non_payment_item_hosp_list2(
                 item_cd=npay_cd,
                 page_no=page_no,
                 num_of_rows=num_of_rows,
@@ -70,13 +73,20 @@ async def hospital_search(
             if not items:
                 break
             
+            # Calculate total pages from first response if available
+            if total_count is not None and total_pages is None:
+                total_pages = math.ceil(total_count / num_of_rows)
+                # Use the smaller of calculated pages or safety limit
+                max_pages = min(total_pages, max_pages)
+            
             all_hospitals.extend(items)
             
+            # Check if we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
-            if page_no > 10:
+            if page_no > max_pages:
                 break
         
         # Format results
@@ -138,9 +148,11 @@ async def hospital_price_range(hospital: str, npay_cd: str) -> str:
         all_hospitals = []
         page_no = 1
         num_of_rows = 100
+        max_pages = 50  # Safety limit
+        total_pages = None
         
         while True:
-            items = await get_non_payment_item_hosp_list2(
+            items, total_count = await get_non_payment_item_hosp_list2(
                 item_cd=npay_cd,
                 page_no=page_no,
                 num_of_rows=num_of_rows
@@ -149,17 +161,24 @@ async def hospital_price_range(hospital: str, npay_cd: str) -> str:
             if not items:
                 break
             
+            # Calculate total pages from first response if available
+            if total_count is not None and total_pages is None:
+                total_pages = math.ceil(total_count / num_of_rows)
+                # Use the smaller of calculated pages or safety limit
+                max_pages = min(total_pages, max_pages)
+            
             # Filter by hospital name
             for item in items:
                 yadm_nm = item.get("yadmNm", "")
                 if hospital in yadm_nm:
                     all_hospitals.append(item)
             
+            # Check if we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
-            if page_no > 10:
+            if page_no > max_pages:
                 break
         
         if not all_hospitals:

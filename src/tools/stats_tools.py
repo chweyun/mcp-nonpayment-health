@@ -2,6 +2,7 @@
 Statistical analysis tools for non-payment items
 """
 import json
+import math
 from typing import Dict, Any, List, Optional
 from src.utils.api_client import (
     get_non_payment_item_sido_cd_list,
@@ -26,12 +27,19 @@ async def stats_by_region(npay_cd: str) -> str:
         found_stat = None
         page_no = 1
         num_of_rows = 100
-        max_pages = 50  # Increased limit to search more pages
+        max_pages = 50  # Safety limit
+        total_pages = None
         
-        while page_no <= max_pages:
-            items = await get_non_payment_item_sido_cd_list(page_no, num_of_rows)
+        while True:
+            items, total_count = await get_non_payment_item_sido_cd_list(page_no, num_of_rows)
             if not items:
                 break
+            
+            # Calculate total pages from first response if available
+            if total_count is not None and total_pages is None:
+                total_pages = math.ceil(total_count / num_of_rows)
+                # Use the smaller of calculated pages or safety limit
+                max_pages = min(total_pages, max_pages)
             
             # Find matching code in current page
             for item in items:
@@ -43,11 +51,13 @@ async def stats_by_region(npay_cd: str) -> str:
             if found_stat:
                 break
             
-            # If this page has fewer items than requested, we've reached the end
+            # Check if we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
+            if page_no > max_pages:
+                break
         
         if not found_stat:
             return json.dumps({
@@ -128,12 +138,19 @@ async def stats_by_hospital_type(npay_cd: str) -> str:
         found_stat = None
         page_no = 1
         num_of_rows = 100
-        max_pages = 50  # Increased limit to search more pages
+        max_pages = 50  # Safety limit
+        total_pages = None
         
-        while page_no <= max_pages:
-            items = await get_non_payment_item_clcd_list(page_no, num_of_rows)
+        while True:
+            items, total_count = await get_non_payment_item_clcd_list(page_no, num_of_rows)
             if not items:
                 break
+            
+            # Calculate total pages from first response if available
+            if total_count is not None and total_pages is None:
+                total_pages = math.ceil(total_count / num_of_rows)
+                # Use the smaller of calculated pages or safety limit
+                max_pages = min(total_pages, max_pages)
             
             # Find matching code in current page
             for item in items:
@@ -145,11 +162,13 @@ async def stats_by_hospital_type(npay_cd: str) -> str:
             if found_stat:
                 break
             
-            # If this page has fewer items than requested, we've reached the end
+            # Check if we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
+            if page_no > max_pages:
+                break
         
         if not found_stat:
             return json.dumps({

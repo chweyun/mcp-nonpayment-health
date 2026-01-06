@@ -56,7 +56,7 @@ async def call_api(
 async def get_non_payment_item_code_list2(
     page_no: int = 1,
     num_of_rows: int = 10
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], Optional[int]]:
     """
     Get non-payment item code list (after 2016.3)
     
@@ -65,7 +65,7 @@ async def get_non_payment_item_code_list2(
         num_of_rows: Number of rows per page
         
     Returns:
-        List of non-payment item codes
+        Tuple of (list of non-payment item codes, totalCount)
     """
     params = {
         "pageNo": page_no,
@@ -75,6 +75,7 @@ async def get_non_payment_item_code_list2(
     data = await call_api("getNonPaymentItemCodeList2", params)
     
     items = []
+    total_count = None
     if "response" in data and "body" in data["response"]:
         body = data["response"]["body"]
         if "items" in body and body["items"]:
@@ -82,8 +83,15 @@ async def get_non_payment_item_code_list2(
             if not isinstance(item_list, list):
                 item_list = [item_list]
             items = item_list
+        # Extract totalCount
+        total_count_str = body.get("totalCount")
+        if total_count_str:
+            try:
+                total_count = int(total_count_str)
+            except (ValueError, TypeError):
+                pass
     
-    return items
+    return items, total_count
 
 
 async def get_non_payment_item_hosp_list2(
@@ -95,7 +103,7 @@ async def get_non_payment_item_hosp_list2(
     sggu_cd: Optional[str] = None,
     yadm_nm: Optional[str] = None,
     search_wrd: Optional[str] = None
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], Optional[int]]:
     """
     Get non-payment item hospital list summary (after 2016.3)
     
@@ -110,7 +118,7 @@ async def get_non_payment_item_hosp_list2(
         search_wrd: Search keyword
         
     Returns:
-        List of hospitals
+        Tuple of (list of hospitals, totalCount)
     """
     params = {
         "pageNo": page_no,
@@ -132,6 +140,7 @@ async def get_non_payment_item_hosp_list2(
     data = await call_api("getNonPaymentItemHospList2", params)
     
     items = []
+    total_count = None
     if "response" in data and "body" in data["response"]:
         body = data["response"]["body"]
         if "items" in body and body["items"]:
@@ -139,8 +148,15 @@ async def get_non_payment_item_hosp_list2(
             if not isinstance(item_list, list):
                 item_list = [item_list]
             items = item_list
+        # Extract totalCount
+        total_count_str = body.get("totalCount")
+        if total_count_str:
+            try:
+                total_count = int(total_count_str)
+            except (ValueError, TypeError):
+                pass
     
-    return items
+    return items, total_count
 
 
 async def get_non_payment_item_hosp_dtl_list(
@@ -199,7 +215,7 @@ async def get_non_payment_item_hosp_dtl_list(
 async def get_non_payment_item_clcd_list(
     page_no: int = 1,
     num_of_rows: int = 10
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], Optional[int]]:
     """
     Get non-payment item statistics by hospital type
     
@@ -208,7 +224,7 @@ async def get_non_payment_item_clcd_list(
         num_of_rows: Number of rows per page
         
     Returns:
-        List of statistics by hospital type
+        Tuple of (list of statistics by hospital type, totalCount)
     """
     params = {
         "pageNo": page_no,
@@ -218,6 +234,7 @@ async def get_non_payment_item_clcd_list(
     data = await call_api("getNonPaymentItemClcdList", params)
     
     items = []
+    total_count = None
     if "response" in data and "body" in data["response"]:
         body = data["response"]["body"]
         if "items" in body and body["items"]:
@@ -225,14 +242,21 @@ async def get_non_payment_item_clcd_list(
             if not isinstance(item_list, list):
                 item_list = [item_list]
             items = item_list
+        # Extract totalCount
+        total_count_str = body.get("totalCount")
+        if total_count_str:
+            try:
+                total_count = int(total_count_str)
+            except (ValueError, TypeError):
+                pass
     
-    return items
+    return items, total_count
 
 
 async def get_non_payment_item_sido_cd_list(
     page_no: int = 1,
     num_of_rows: int = 10
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], Optional[int]]:
     """
     Get non-payment item statistics by region
     
@@ -241,7 +265,7 @@ async def get_non_payment_item_sido_cd_list(
         num_of_rows: Number of rows per page
         
     Returns:
-        List of statistics by region
+        Tuple of (list of statistics by region, totalCount)
     """
     params = {
         "pageNo": page_no,
@@ -251,6 +275,7 @@ async def get_non_payment_item_sido_cd_list(
     data = await call_api("getNonPaymentItemSidoCdList", params)
     
     items = []
+    total_count = None
     if "response" in data and "body" in data["response"]:
         body = data["response"]["body"]
         if "items" in body and body["items"]:
@@ -258,6 +283,13 @@ async def get_non_payment_item_sido_cd_list(
             if not isinstance(item_list, list):
                 item_list = [item_list]
             items = item_list
+        # Extract totalCount
+        total_count_str = body.get("totalCount")
+        if total_count_str:
+            try:
+                total_count = int(total_count_str)
+            except (ValueError, TypeError):
+                pass
     
-    return items
+    return items, total_count
 

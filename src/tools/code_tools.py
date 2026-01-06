@@ -2,6 +2,7 @@
 Code management tools for non-payment items
 """
 import json
+import math
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from src.utils.api_client import get_non_payment_item_code_list2
@@ -24,11 +25,19 @@ async def code_search(keyword: str, date: Optional[str] = None) -> str:
         all_items = []
         page_no = 1
         num_of_rows = 100
+        max_pages = 50  # Safety limit
+        total_pages = None
         
         while True:
-            items = await get_non_payment_item_code_list2(page_no, num_of_rows)
+            items, total_count = await get_non_payment_item_code_list2(page_no, num_of_rows)
             if not items:
                 break
+            
+            # Calculate total pages from first response if available
+            if total_count is not None and total_pages is None:
+                total_pages = math.ceil(total_count / num_of_rows)
+                # Use the smaller of calculated pages or safety limit
+                max_pages = min(total_pages, max_pages)
             
             # Filter by keyword
             matching_items = []
@@ -39,11 +48,12 @@ async def code_search(keyword: str, date: Optional[str] = None) -> str:
             
             all_items.extend(matching_items)
             
+            # Check if we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
-            if page_no > 10:  # Limit to 10 pages
+            if page_no > max_pages:
                 break
         
         # Format results
@@ -108,12 +118,19 @@ async def code_hierarchy(npay_cd: str) -> str:
         found_item = None
         page_no = 1
         num_of_rows = 100
-        max_pages = 50  # Increased limit to search more pages
+        max_pages = 50  # Safety limit
+        total_pages = None
         
-        while page_no <= max_pages:
-            items = await get_non_payment_item_code_list2(page_no, num_of_rows)
+        while True:
+            items, total_count = await get_non_payment_item_code_list2(page_no, num_of_rows)
             if not items:
                 break
+            
+            # Calculate total pages from first response if available
+            if total_count is not None and total_pages is None:
+                total_pages = math.ceil(total_count / num_of_rows)
+                # Use the smaller of calculated pages or safety limit
+                max_pages = min(total_pages, max_pages)
             
             # Search for the code in current page
             for item in items:
@@ -125,11 +142,13 @@ async def code_hierarchy(npay_cd: str) -> str:
             if found_item:
                 break
             
-            # If this page has fewer items than requested, we've reached the end
+            # Check if we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
+            if page_no > max_pages:
+                break
         
         if not found_item:
             return json.dumps({
@@ -235,12 +254,19 @@ async def code_validate(npay_cd: str, date: str) -> str:
         found_item = None
         page_no = 1
         num_of_rows = 100
-        max_pages = 50  # Increased limit to search more pages
+        max_pages = 50  # Safety limit
+        total_pages = None
         
-        while page_no <= max_pages:
-            items = await get_non_payment_item_code_list2(page_no, num_of_rows)
+        while True:
+            items, total_count = await get_non_payment_item_code_list2(page_no, num_of_rows)
             if not items:
                 break
+            
+            # Calculate total pages from first response if available
+            if total_count is not None and total_pages is None:
+                total_pages = math.ceil(total_count / num_of_rows)
+                # Use the smaller of calculated pages or safety limit
+                max_pages = min(total_pages, max_pages)
             
             # Search for the code in current page
             for item in items:
@@ -252,11 +278,13 @@ async def code_validate(npay_cd: str, date: str) -> str:
             if found_item:
                 break
             
-            # If this page has fewer items than requested, we've reached the end
+            # Check if we've reached the end
             if len(items) < num_of_rows:
                 break
             
             page_no += 1
+            if page_no > max_pages:
+                break
         
         if not found_item:
             return json.dumps({
