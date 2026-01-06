@@ -156,8 +156,10 @@ async def messages_endpoint(request: Request):
             )
         
         elif method == "tools/list":
-            # Get list of tools from server
-            tools_list = await mcp_server.list_tools()
+            # Get list of tools directly from the tools module
+            from src.tools import get_all_tools
+            
+            tools_list = get_all_tools()
             
             tools_dict = [
                 {
