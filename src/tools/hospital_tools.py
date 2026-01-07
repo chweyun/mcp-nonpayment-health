@@ -103,10 +103,17 @@ async def hospital_search(
                 if sido not in sido_cd_nm:
                     continue
             
-            # Filter by district if specified
+            # Filter by district if specified (partial match)
             if sggu:
                 sggu_cd_nm = item.get("sgguCdNm", "")
-                if sggu not in sggu_cd_nm:
+                if not sggu_cd_nm:
+                    continue
+                # Normalize both strings: remove whitespace and common suffixes
+                sggu_normalized = sggu.strip().replace(" ", "")
+                sggu_cd_nm_normalized = sggu_cd_nm.strip().replace(" ", "")
+                # Check if sggu is contained in sggu_cd_nm (case-sensitive partial match)
+                # Example: "수원" should match "수원팔달구", "수원영통구", etc.
+                if sggu_normalized not in sggu_cd_nm_normalized:
                     continue
             
             try:
@@ -239,7 +246,8 @@ async def hospital_price_range(hospital: str, npay_cd: str) -> str:
 async def hospital_compare(
     npay_cd: str,
     sido: str,
-    sggu: Optional[str] = None
+    sggu: Optional[str] = None,
+    include_explanation: bool = False
 ) -> str:
     """
     Compare prices across hospitals in the same region
@@ -248,6 +256,7 @@ async def hospital_compare(
         npay_cd: Non-payment code
         sido: City/Province name
         sggu: District name (optional)
+        include_explanation: Whether to include code explanation (optional)
         
     Returns:
         JSON string with comparison results
@@ -318,6 +327,18 @@ async def hospital_compare(
             "medianPrice": median_price,
             "hospitalCount": len(hospitals)
         }
+        
+        # Add savings calculation if cheapest is available
+        if median_price and cheapest_price != float('inf'):
+            result["savings"] = median_price - cheapest_price
+        
+        # Add explanation if requested
+        if include_explanation:
+            from src.tools.code_tools import code_explain
+            explain_result = await code_explain(npay_cd)
+            explain_data = json.loads(explain_result)
+            if explain_data.get("success"):
+                result["explanation"] = explain_data.get("plainExplanation", "")
         
         return json.dumps(result, ensure_ascii=False, indent=2)
     

@@ -21,7 +21,7 @@ async def decision_cheapest_option(
     sggu: Optional[str] = None
 ) -> str:
     """
-    Find the cheapest option based on location
+    Find the cheapest option based on location (wrapper for hospital_compare with explanation)
     
     Args:
         npay_cd: Non-payment code
@@ -32,8 +32,8 @@ async def decision_cheapest_option(
         JSON string with cheapest option information
     """
     try:
-        # Get hospital comparison
-        compare_result = await hospital_compare(npay_cd, sido, sggu)
+        # Get hospital comparison with explanation
+        compare_result = await hospital_compare(npay_cd, sido, sggu, include_explanation=True)
         compare_data = json.loads(compare_result)
         
         if not compare_data.get("success"):
@@ -41,7 +41,6 @@ async def decision_cheapest_option(
         
         cheapest = compare_data.get("cheapest")
         cheapest_price = compare_data.get("cheapestPrice")
-        median_price = compare_data.get("medianPrice")
         
         if not cheapest:
             return json.dumps({
@@ -49,25 +48,18 @@ async def decision_cheapest_option(
                 "error": "No cheapest option found"
             }, ensure_ascii=False)
         
-        # Get code explanation
-        explain_result = await code_explain(npay_cd)
-        explain_data = json.loads(explain_result)
-        explanation = explain_data.get("plainExplanation", "") if explain_data.get("success") else ""
-        
+        # Format result in cheapest_option format
         result = {
             "success": True,
             "npayCd": npay_cd,
-            "region": {
-                "sido": sido,
-                "sggu": sggu
-            },
+            "region": compare_data.get("region"),
             "cheapestOption": {
                 "hospital": cheapest,
                 "price": cheapest_price
             },
-            "medianPrice": median_price,
-            "savings": median_price - cheapest_price if median_price and cheapest_price else None,
-            "explanation": explanation
+            "medianPrice": compare_data.get("medianPrice"),
+            "savings": compare_data.get("savings"),
+            "explanation": compare_data.get("explanation", "")
         }
         
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -82,10 +74,21 @@ async def decision_cheapest_option(
 async def _decision_reasonable_price_impl(
     npay_cd: str,
     price: float,
-    sido: Optional[str] = None
+    sido: Optional[str] = None,
+    hospital: Optional[str] = None,
+    threshold: float = 0.2,
+    use_outlier_detection: bool = False
 ) -> str:
     """
     Internal implementation of decision_reasonable_price (without timeout wrapper)
+    
+    Args:
+        npay_cd: Non-payment code
+        price: Price to check
+        sido: City/Province name (optional)
+        hospital: Hospital name (optional, for outlier detection)
+        threshold: Deviation threshold (default 0.2 for reasonable, 0.3 for outlier)
+        use_outlier_detection: Whether to use outlier detection mode (different threshold and logic)
     """
     # First, verify code exists (quick check)
     from src.tools.code_tools import code_hierarchy
@@ -97,6 +100,47 @@ async def _decision_reasonable_price_impl(
             "success": False,
             "error": f"Cannot determine reasonableness: Code {npay_cd} not found. Please verify the code is correct."
         }, ensure_ascii=False)
+    
+    # If hospital is provided, try hospital-specific price range check first (outlier detection mode)
+    if hospital and use_outlier_detection:
+        from src.tools.hospital_tools import hospital_price_range
+        price_range_result = await hospital_price_range(hospital, npay_cd)
+        
+        if price_range_result:
+            price_range_data = json.loads(price_range_result)
+            
+            if price_range_data.get("success"):
+                min_price = price_range_data.get("min")
+                max_price = price_range_data.get("max")
+                
+                if min_price is not None and max_price is not None:
+                    # Check if price is within range
+                    is_outlier = price < min_price or price > max_price
+                    is_high = price > max_price
+                    
+                    if is_outlier:
+                        if is_high:
+                            reason = f"병원 최대 가격({max_price:,}원)보다 {price - max_price:,.0f}원 높음"
+                        else:
+                            reason = f"병원 최소 가격({min_price:,}원)보다 {min_price - price:,.0f}원 낮음"
+                    else:
+                        reason = "정상 범위 내"
+                    
+                    result = {
+                        "success": True,
+                        "isOutlier": is_outlier,
+                        "isHigh": is_high,
+                        "reason": reason,
+                        "price": price,
+                        "hospital": hospital,
+                        "priceRange": {
+                            "min": min_price,
+                            "max": max_price
+                        },
+                        "mode": "outlier_detection"
+                    }
+                    
+                    return json.dumps(result, ensure_ascii=False, indent=2)
     
     # Get statistics
     if sido:
@@ -116,19 +160,30 @@ async def _decision_reasonable_price_impl(
                     # Calculate deviation from average
                     deviation = abs(price - avg_price) / avg_price
                     
-                    # Reasonable if within 20% of average
-                    is_reasonable = deviation <= 0.2
+                    # Check against threshold
+                    is_reasonable = deviation <= threshold
                     
                     # Determine judgement
-                    if is_reasonable:
-                        judgement = "합리적"
-                        basis = f"{sido} 지역 평균({avg_price:,}원) 대비 ±20% 이내"
-                    elif price > avg_price:
-                        judgement = "비싼 편"
-                        basis = f"{sido} 지역 평균({avg_price:,}원)보다 {((price - avg_price) / avg_price * 100):.1f}% 높음"
+                    threshold_pct = threshold * 100
+                    if use_outlier_detection:
+                        # Outlier detection mode
+                        is_outlier = deviation > threshold
+                        if is_outlier:
+                            judgement = "이상치" if price > avg_price else "낮은 편"
+                        else:
+                            judgement = "정상 범위"
+                        basis = f"{sido} 지역 평균({avg_price:,}원) 대비 {deviation * 100:.1f}% {'높음' if price > avg_price else '낮음'}"
                     else:
-                        judgement = "저렴한 편"
-                        basis = f"{sido} 지역 평균({avg_price:,}원)보다 {((avg_price - price) / avg_price * 100):.1f}% 낮음"
+                        # Reasonable price mode
+                        if is_reasonable:
+                            judgement = "합리적"
+                            basis = f"{sido} 지역 평균({avg_price:,}원) 대비 ±{threshold_pct:.0f}% 이내"
+                        elif price > avg_price:
+                            judgement = "비싼 편"
+                            basis = f"{sido} 지역 평균({avg_price:,}원)보다 {((price - avg_price) / avg_price * 100):.1f}% 높음"
+                        else:
+                            judgement = "저렴한 편"
+                            basis = f"{sido} 지역 평균({avg_price:,}원)보다 {((avg_price - price) / avg_price * 100):.1f}% 낮음"
                     
                     result = {
                         "success": True,
@@ -141,7 +196,10 @@ async def _decision_reasonable_price_impl(
                             "min": min_price,
                             "max": max_price
                         },
-                        "deviation": deviation
+                        "deviation": deviation,
+                        "mode": "outlier_detection" if use_outlier_detection else "reasonable_price",
+                        "isOutlier": deviation > threshold if use_outlier_detection else None,
+                        "isHigh": price > avg_price if use_outlier_detection else None
                     }
                     
                     return json.dumps(result, ensure_ascii=False, indent=2)
@@ -153,17 +211,26 @@ async def _decision_reasonable_price_impl(
             if overall_avg > 0:
                 # Use overall statistics from region stats
                 deviation = abs(price - overall_avg) / overall_avg
-                is_reasonable = deviation <= 0.2
+                is_reasonable = deviation <= threshold
+                threshold_pct = threshold * 100
                 
-                if is_reasonable:
-                    judgement = "합리적"
-                    basis = f"전체 평균({overall_avg:,}원) 대비 ±20% 이내 ({sido} 지역 데이터 없음)"
-                elif price > overall_avg:
-                    judgement = "비싼 편"
-                    basis = f"전체 평균({overall_avg:,}원)보다 {((price - overall_avg) / overall_avg * 100):.1f}% 높음 ({sido} 지역 데이터 없음)"
+                if use_outlier_detection:
+                    is_outlier = deviation > threshold
+                    if is_outlier:
+                        judgement = "이상치" if price > overall_avg else "낮은 편"
+                    else:
+                        judgement = "정상 범위"
+                    basis = f"전체 평균({overall_avg:,}원) 대비 {deviation * 100:.1f}% {'높음' if price > overall_avg else '낮음'} ({sido} 지역 데이터 없음)"
                 else:
-                    judgement = "저렴한 편"
-                    basis = f"전체 평균({overall_avg:,}원)보다 {((overall_avg - price) / overall_avg * 100):.1f}% 낮음 ({sido} 지역 데이터 없음)"
+                    if is_reasonable:
+                        judgement = "합리적"
+                        basis = f"전체 평균({overall_avg:,}원) 대비 ±{threshold_pct:.0f}% 이내 ({sido} 지역 데이터 없음)"
+                    elif price > overall_avg:
+                        judgement = "비싼 편"
+                        basis = f"전체 평균({overall_avg:,}원)보다 {((price - overall_avg) / overall_avg * 100):.1f}% 높음 ({sido} 지역 데이터 없음)"
+                    else:
+                        judgement = "저렴한 편"
+                        basis = f"전체 평균({overall_avg:,}원)보다 {((overall_avg - price) / overall_avg * 100):.1f}% 낮음 ({sido} 지역 데이터 없음)"
                 
                 result = {
                     "success": True,
@@ -177,7 +244,10 @@ async def _decision_reasonable_price_impl(
                         "min": overall.get("min", 0),
                         "max": overall.get("max", 0)
                     },
-                    "deviation": deviation
+                    "deviation": deviation,
+                    "mode": "outlier_detection" if use_outlier_detection else "reasonable_price",
+                    "isOutlier": deviation > threshold if use_outlier_detection else None,
+                    "isHigh": price > overall_avg if use_outlier_detection else None
                 }
                 
                 return json.dumps(result, ensure_ascii=False, indent=2)
@@ -216,17 +286,26 @@ async def _decision_reasonable_price_impl(
     
     # Calculate deviation
     deviation = abs(price - avg_price) / avg_price
-    is_reasonable = deviation <= 0.2
+    is_reasonable = deviation <= threshold
+    threshold_pct = threshold * 100
     
-    if is_reasonable:
-        judgement = "합리적"
-        basis = f"전체 평균({avg_price:,}원) 대비 ±20% 이내"
-    elif price > avg_price:
-        judgement = "비싼 편"
-        basis = f"전체 평균({avg_price:,}원)보다 {((price - avg_price) / avg_price * 100):.1f}% 높음"
+    if use_outlier_detection:
+        is_outlier = deviation > threshold
+        if is_outlier:
+            judgement = "이상치" if price > avg_price else "낮은 편"
+        else:
+            judgement = "정상 범위"
+        basis = f"전체 평균({avg_price:,}원) 대비 {deviation * 100:.1f}% {'높음' if price > avg_price else '낮음'}"
     else:
-        judgement = "저렴한 편"
-        basis = f"전체 평균({avg_price:,}원)보다 {((avg_price - price) / avg_price * 100):.1f}% 낮음"
+        if is_reasonable:
+            judgement = "합리적"
+            basis = f"전체 평균({avg_price:,}원) 대비 ±{threshold_pct:.0f}% 이내"
+        elif price > avg_price:
+            judgement = "비싼 편"
+            basis = f"전체 평균({avg_price:,}원)보다 {((price - avg_price) / avg_price * 100):.1f}% 높음"
+        else:
+            judgement = "저렴한 편"
+            basis = f"전체 평균({avg_price:,}원)보다 {((avg_price - price) / avg_price * 100):.1f}% 낮음"
     
     result = {
         "success": True,
@@ -238,8 +317,14 @@ async def _decision_reasonable_price_impl(
             "min": overall.get("min", 0),
             "max": overall.get("max", 0)
         },
-        "deviation": deviation
+        "deviation": deviation,
+        "mode": "outlier_detection" if use_outlier_detection else "reasonable_price",
+        "isOutlier": deviation > threshold if use_outlier_detection else None,
+        "isHigh": price > avg_price if use_outlier_detection else None
     }
+    
+    if hospital:
+        result["hospital"] = hospital
     
     return json.dumps(result, ensure_ascii=False, indent=2)
 
@@ -247,7 +332,10 @@ async def _decision_reasonable_price_impl(
 async def decision_reasonable_price(
     npay_cd: str,
     price: float,
-    sido: Optional[str] = None
+    sido: Optional[str] = None,
+    hospital: Optional[str] = None,
+    threshold: float = 0.2,
+    use_outlier_detection: bool = False
 ) -> str:
     """
     Determine if a price is reasonable
@@ -263,7 +351,7 @@ async def decision_reasonable_price(
     try:
         # Wrap with timeout
         result = await asyncio.wait_for(
-            _decision_reasonable_price_impl(npay_cd, price, sido),
+            _decision_reasonable_price_impl(npay_cd, price, sido, hospital, threshold, use_outlier_detection),
             timeout=DECISION_OPERATION_TIMEOUT
         )
         return result
