@@ -248,45 +248,20 @@ docker run -d \
 - **pydantic** - 데이터 검증
 - **xmltodict** - XML 파싱
 
-## 🌐 배포
+## 📢 공공저작물 출처표시 (공공누리 제1유형)
 
-### MCP 클라이언트와 함께 사용하기
+본 프로젝트는 공공누리 제1유형(출처표시)으로 개방된 공공저작물을 활용하여 제작되었습니다.
 
-**Amazon Q CLI:**
-```json
-{
-  "mcpServers": {
-    "nonpayment-health": {
-      "command": "python",
-      "args": ["run_server.py"],
-      "cwd": "/path/to/mcp-nonpayment-health"
-    }
-  }
-}
-```
+본 저작물은 건강보험심사평가원에서 작성·개방한
+「비급여진료비정보서비스」 공공데이터를
+공공누리 제1유형(출처표시) 조건에 따라 이용하였습니다.
 
-**기타 MCP 클라이언트:**
-```json
-{
-  "mcpServers": {
-    "nonpayment-health": {
-      "url": "https://your-server.com/nonpayment-health/messages"
-    }
-  }
-}
-```
+해당 공공데이터는
+공공데이터포털(data.go.kr)
+https://www.data.go.kr
 
-**참고:** 같은 서버에 여러 MCP 서버를 호스팅하는 경우, 각 서버는 다른 API 경로를 사용합니다:
-- `mcp-link-scan`: `/messages` 또는 `/link-scan/messages`
-- `mcp-nonpayment-health`: `/nonpayment-health/messages`
+에서 무료로 제공됩니다.
 
-## 📄 라이선스
-
-이 프로젝트는 MIT 라이선스를 따릅니다. 자세한 내용은 LICENSE 파일을 참조하세요.
-
-## 🙏 감사의 말
-
-- **건강보험심사평가원** - 비급여진료비정보서비스 API 제공
-- **MCP** 팀 - Model Context Protocol 명세
-- **Pydantic** 팀 - 데이터 검증 라이브러리
-
+본 프로젝트는 위 공공데이터를 기반으로 비급여 진료비 정보를 조회·분석하기 위한 MCP 서버로,
+데이터의 가공·분석 결과 및 이에 대한 해석의 책임은 본 프로젝트에 있으며,
+건강보험심사평가원 또는 기타 공공기관의 공식 입장이나 후원, 보증을 의미하지 않습니다.
